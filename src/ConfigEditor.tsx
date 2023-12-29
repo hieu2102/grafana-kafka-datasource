@@ -89,6 +89,25 @@ export class ConfigEditor extends PureComponent<Props, State> {
     onOptionsChange({ ...options, jsonData });
   };
 
+  onMessageFormatChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onOptionsChange, options } = this.props;
+    const jsonData = {
+      ...options.jsonData,
+      messageFormat: event.target.value,
+    };
+    onOptionsChange({ ...options, jsonData });
+  };
+
+  onSchemaRegistryUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const { onOptionsChange, options } = this.props;
+    const jsonData = {
+      ...options.jsonData,
+      schemaRegistryUrl: event.target.value,
+    };
+    onOptionsChange({ ...options, jsonData });
+  };
+
+
   render() {
     const { options } = this.props;
     const { jsonData, secureJsonFields } = options;
@@ -171,6 +190,26 @@ export class ConfigEditor extends PureComponent<Props, State> {
             type="number"
             step="1"
             min="0"
+          />
+        </div>
+
+        <div className="gf-form">
+          <FormField
+            label="Message Format"
+            labelWidth={11}
+            onChange={this.onMessageFormatChange}
+            value={jsonData.messageFormat || ''}
+            placeholder="<json|avro>"
+          />
+        </div>
+
+        <div className="gf-form">
+          <FormField
+            label="Schema Registry URL"
+            labelWidth={11}
+            onChange={this.onSchemaRegistryUrlChange}
+            value={jsonData.schemaRegistryUrl || ''}
+            placeholder="<http://registry:8081>"
           />
         </div>
       </div>

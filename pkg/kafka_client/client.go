@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"github.com/confluentinc/confluent-kafka-go/schemaregistry"
+	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde"
+	"github.com/confluentinc/confluent-kafka-go/schemaregistry/serde/avro"
 )
 
 const MAX_EARLIEST int64 = 100
@@ -21,6 +24,8 @@ type Options struct {
 	// silently fails to parse the timeout from the s.JSONData.  Figure out why.
 	HealthcheckTimeout int32  `json:"healthcheckTimeout"`
 	Debug              string `json:"debug"`
+	MessageFormat      string `json:"messageFormat"`
+	SchemaRegistryUrl  string `json:"schemaRegistryUrl"`
 }
 
 type KafkaClient struct {
@@ -33,6 +38,9 @@ type KafkaClient struct {
 	SaslPassword       string
 	Debug              string
 	HealthcheckTimeout int32
+	MessageFormat      string
+	SchemaRegistryUrl  string
+	AvroDeserializer   *avro.GenericDeserializer
 }
 
 type KafkaMessage struct {
@@ -50,6 +58,8 @@ func NewKafkaClient(options Options) KafkaClient {
 		SaslPassword:       options.SaslPassword,
 		Debug:              options.Debug,
 		HealthcheckTimeout: options.HealthcheckTimeout,
+		MessageFormat:      options.MessageFormat,
+		SchemaRegistryUrl:  options.SchemaRegistryUrl,
 	}
 	return client
 }
@@ -78,7 +88,20 @@ func (client *KafkaClient) consumerInitialize() {
 	if client.Debug != "" {
 		config.SetKey("debug", client.Debug)
 	}
+	if client.MessageFormat == "avro" {
+		if client.SchemaRegistryUrl == "" {
+			panic("SchemaRegistryUrl must be set when using 'avro' format")
+		}
+		schemaRegistryClient, err := schemaregistry.NewClient(schemaregistry.NewConfig(client.SchemaRegistryUrl))
+		if err != nil {
+			panic(err)
+		}
+		client.AvroDeserializer, err = avro.NewGenericDeserializer(schemaRegistryClient, serde.ValueSerde, avro.NewDeserializerConfig())
+		if err != nil {
+			panic(err)
+		}
 
+	}
 	client.Consumer, err = kafka.NewConsumer(&config)
 
 	if err != nil {
@@ -135,7 +158,14 @@ func (client *KafkaClient) ConsumerPull() (KafkaMessage, kafka.Event) {
 
 	switch e := ev.(type) {
 	case *kafka.Message:
-		json.Unmarshal([]byte(e.Value), &message.Value)
+		if client.MessageFormat == "avro" {
+			err := client.AvroDeserializer.DeserializeInto(*e.TopicPartition.Topic, e.Value, &message.Value)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			json.Unmarshal([]byte(e.Value), &message.Value)
+		}
 		message.Offset = e.TopicPartition.Offset
 		message.Timestamp = e.Timestamp
 	case kafka.Error:
