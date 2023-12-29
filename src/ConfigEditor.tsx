@@ -107,7 +107,6 @@ export class ConfigEditor extends PureComponent<Props, State> {
     onOptionsChange({ ...options, jsonData });
   };
 
-
   render() {
     const { options } = this.props;
     const { jsonData, secureJsonFields } = options;
